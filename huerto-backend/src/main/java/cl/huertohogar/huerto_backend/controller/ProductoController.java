@@ -2,11 +2,12 @@
 package cl.huertohogar.huerto_backend.controller;
 
 import cl.huertohogar.huerto_backend.dto.ProductoDTO;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.PathVariable;
+import cl.huertohogar.huerto_backend.service.ProductoService;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -14,44 +15,59 @@ import java.util.List;
 @RequestMapping("/api/v1/productos")
 public class ProductoController {
 
+    private final ProductoService productoService;
+
+    public ProductoController(ProductoService productoService) {
+        this.productoService = productoService;
+    }
+
+    // GET: Listar todos los productos
     @GetMapping
     public List<ProductoDTO> listarProductos() {
-
-        return List.of(
-                new ProductoDTO(
-                        1L,
-                        "Manzana Roja",
-                        1200,
-                        "Frutas",
-                        "Manzanas frescas",
-                        "manzana.jpg",
-                        false,
-                        0,
-                        30
-                ),
-                new ProductoDTO(
-                        2L,
-                        "Zanahoria",
-                        990,
-                        "Verduras",
-                        "Zanahorias frescas",
-                        "zanahoria.jpg",
-                        true,
-                        20,
-                        15
-                )
-        );
+        return productoService.listar();
     }
+
+    // GET: Buscar un producto por ID
     @GetMapping("/{id}")
     public ResponseEntity<ProductoDTO> buscarPorId(
             @PathVariable Long id) {
 
-        return listarProductos().stream()
-                .filter(producto -> producto.id().equals(id))
-                .findFirst()
+        return productoService.buscarPorId(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() ->
-                        ResponseEntity.notFound().build()
-                );
+                        ResponseEntity.notFound().build());
+    }
+
+    // POST: Crear un nuevo producto
+    @PostMapping
+    public ResponseEntity<ProductoDTO> crearProducto(
+            @Valid @RequestBody ProductoDTO datos) {
+
+        ProductoDTO nuevo = productoService.crear(datos);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(nuevo);
+    }
+    @PutMapping("/{id}")
+    public ResponseEntity<ProductoDTO> actualizarProducto(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductoDTO datos) {
+
+        return productoService.actualizar(id, datos)
+                .map(ResponseEntity::ok)
+                .orElseGet(() ->
+                        ResponseEntity.notFound().build());
+    }
+    // DELETE: Eliminar un producto por su ID
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarProducto(
+            @PathVariable Long id) {
+
+        if (productoService.eliminar(id).isPresent()) {
+            return ResponseEntity.noContent().build();
+        }
+
+        return ResponseEntity.notFound().build();
     }
 }

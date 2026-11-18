@@ -62,4 +62,35 @@ public class ProductoService {
 
         return nuevo;
     }
+    public Optional<ProductoDTO> actualizar(
+            Long id, ProductoDTO datos) {
+
+        // Verificamos si existe el producto
+        if (!productos.containsKey(id)) {
+            return Optional.empty();
+        }
+
+        // Creamos el producto con los nuevos datos
+        ProductoDTO actualizado = new ProductoDTO(
+                id,
+                datos.nombre(),
+                datos.precio(),
+                datos.categoria(),
+                datos.descripcion(),
+                datos.imagen(),
+                datos.oferta(),
+                datos.descuento(),
+                datos.stock()
+        );
+
+        // Reemplazamos el producto anterior
+        productos.put(id, actualizado);
+
+        return Optional.of(actualizado);
+    }
+    public Optional<ProductoDTO> eliminar(Long id) {
+
+        return Optional.ofNullable(productos.remove(id));
+
+    }
 }
