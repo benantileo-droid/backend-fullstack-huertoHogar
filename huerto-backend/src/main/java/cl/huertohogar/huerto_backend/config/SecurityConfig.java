@@ -19,7 +19,10 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                HttpMethod.GET, "/api/v1/estado"
+                                HttpMethod.GET,
+                                "/api/v1/estado",
+                                "/api/v1/productos",
+                                "/api/v1/productos/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
