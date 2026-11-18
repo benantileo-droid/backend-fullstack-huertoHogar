@@ -8,7 +8,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.test.context.support.WithMockUser;
-
+import cl.huertohogar.huerto_backend.repository.ProductoRepository;
+import org.springframework.transaction.annotation.Transactional;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -16,6 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 public class ProductoControllerTest {
+
+    @Autowired
+    private ProductoRepository productoRepository;
 
     @Autowired
     private MockMvc mockMvc;
@@ -216,5 +221,125 @@ public class ProductoControllerTest {
                 // Esperamos HTTP 404 Not Found
                 .andExpect(status().isNotFound());
     }
+    @Test
+    @Transactional
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void crearProductoEnMySQL() throws Exception {
+
+        // Contamos los productos antes de comenzar
+        long cantidadInicial = productoRepository.count();
+
+        // Producto que utilizaremos en la prueba
+        String productoJson = """
+        {
+            "nombre": "Manzana de prueba MySQL",
+            "precio": 1200,
+            "categoria": "Frutas",
+            "descripcion": "Manzanas frescas",
+            "imagen": "manzana.jpg",
+            "oferta": false,
+            "descuento": 0,
+            "stock": 30
+        }
+        """;
+
+        // Simulamos el POST
+        mockMvc.perform(post("/api/v1/productos")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(productoJson))
+
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.nombre")
+                        .value("Manzana de prueba MySQL"))
+                .andExpect(jsonPath("$.precio").value(1200));
+
+        // Comprobamos que MySQL tiene un producto mas
+        assertEquals(
+                cantidadInicial + 1,
+                productoRepository.count()
+        );
+    }
+
+    @Test
+    @Transactional
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void actualizarProductoEnMySQL() throws Exception {
+
+        // 1. Creamos un producto de prueba
+        String productoJson = """
+        {
+            "nombre": "Manzana de prueba PUT",
+            "precio": 1200,
+            "categoria": "Frutas",
+            "descripcion": "Manzanas frescas",
+            "imagen": "manzana.jpg",
+            "oferta": false,
+            "descuento": 0,
+            "stock": 30
+        }
+        """;
+
+        String respuesta = mockMvc.perform(
+                        post("/api/v1/productos")
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(productoJson))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 2. Obtenemos el ID generado por MySQL
+        Number idGenerado =
+                com.jayway.jsonpath.JsonPath.read(
+                        respuesta, "$.id"
+                );
+
+        long id = idGenerado.longValue();
+
+        // 3. Preparamos los nuevos datos
+        String productoActualizado = """
+        {
+            "nombre": "Manzana de prueba PUT",
+            "precio": 1500,
+            "categoria": "Frutas",
+            "descripcion": "Manzanas frescas",
+            "imagen": "manzana.jpg",
+            "oferta": false,
+            "descuento": 0,
+            "stock": 30
+        }
+        """;
+
+        // 4. Actualizamos mediante PUT
+        mockMvc.perform(
+                        put("/api/v1/productos/{id}", id)
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(productoActualizado))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.precio").value(1500));
+
+        // 5. Verificamos la actualización mediante GET
+        mockMvc.perform(
+                        get("/api/v1/productos/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.precio").value(1500));
+
+        // 6. Comprobamos mediante el Repository
+        productoRepository.flush();
+
+        assertEquals(
+                1500,
+                productoRepository.findById(id)
+                        .orElseThrow()
+                        .getPrecio()
+                        .intValue()
+        );
+    }
+
 
 }
