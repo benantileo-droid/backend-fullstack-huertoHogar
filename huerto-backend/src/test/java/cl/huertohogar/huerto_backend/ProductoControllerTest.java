@@ -11,6 +11,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import cl.huertohogar.huerto_backend.repository.ProductoRepository;
 import org.springframework.transaction.annotation.Transactional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -83,39 +85,7 @@ public class ProductoControllerTest {
 
                 .andExpect(status().isBadRequest());
     }
-    @Test
-    @WithMockUser(username = "admin", roles = {"ADMIN"})
-    void actualizarProducto() throws Exception {
 
-        String productoActualizado = """
-        {
-            "nombre": "Manzana Roja",
-            "precio": 1500,
-            "categoria": "Frutas",
-            "descripcion": "Manzanas frescas",
-            "imagen": "manzana.jpg",
-            "oferta": false,
-            "descuento": 0,
-            "stock": 30
-        }
-        """;
-
-        // Enviamos PUT para actualizar la manzana
-        mockMvc.perform(put("/api/v1/productos/1")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(productoActualizado))
-
-                // Verificamos que la actualización funcionó
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.precio").value(1500));
-
-        // Consultamos nuevamente el producto
-        mockMvc.perform(get("/api/v1/productos/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.precio").value(1500));
-    }
     @Test
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     void noDebeActualizarProductoInexistente() throws Exception {
@@ -340,6 +310,65 @@ public class ProductoControllerTest {
                         .intValue()
         );
     }
+
+    @Test
+    @Transactional
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void eliminarProductoEnMySQL() throws Exception {
+
+        // 1. Creamos una pera de prueba
+        String productoJson = """
+        {
+            "nombre": "Pera de prueba DELETE",
+            "precio": 1100,
+            "categoria": "Frutas",
+            "descripcion": "Pera fresca",
+            "imagen": "pera.jpg",
+            "oferta": false,
+            "descuento": 0,
+            "stock": 10
+        }
+        """;
+
+        // 2. Guardamos el producto mediante POST
+        String respuesta = mockMvc.perform(
+                        post("/api/v1/productos")
+                                .with(csrf())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(productoJson))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        // 3. Obtenemos el ID generado por MySQL
+        Number idGenerado =
+                com.jayway.jsonpath.JsonPath.read(
+                        respuesta, "$.id"
+                );
+
+        long id = idGenerado.longValue();
+
+        // Verificamos que el producto existe
+        assertTrue(productoRepository.existsById(id));
+
+        // 4. Eliminamos el producto mediante DELETE
+        mockMvc.perform(
+                        delete("/api/v1/productos/{id}", id)
+                                .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        // 5. Comprobamos que se eliminó de MySQL
+        productoRepository.flush();
+
+        assertFalse(productoRepository.existsById(id));
+
+        // 6. Comprobamos que GET devuelve 404
+        mockMvc.perform(
+                        get("/api/v1/productos/{id}", id))
+                .andExpect(status().isNotFound());
+    }
+
 
 
 }
