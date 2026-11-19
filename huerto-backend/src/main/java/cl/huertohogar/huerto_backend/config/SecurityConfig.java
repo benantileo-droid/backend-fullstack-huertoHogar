@@ -217,6 +217,11 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/v1/admin/usuarios"
                         ).hasRole("ADMIN")
+                        // Solo ADMIN puede cambiar el rol de un usuario
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/admin/usuarios/*/rol"
+                        ).hasRole("ADMIN")
 
                         // =========================
                         // BLOQUEAR RUTAS NO DEFINIDAS
