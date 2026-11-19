@@ -2,7 +2,9 @@
 package cl.huertohogar.huerto_backend.service;
 
 import cl.huertohogar.huerto_backend.dto.ProductoDTO;
+import cl.huertohogar.huerto_backend.entity.Categoria;
 import cl.huertohogar.huerto_backend.entity.Producto;
+import cl.huertohogar.huerto_backend.repository.CategoriaRepository;
 import cl.huertohogar.huerto_backend.repository.ProductoRepository;
 
 import org.springframework.stereotype.Service;
@@ -15,29 +17,47 @@ import java.util.Optional;
 public class ProductoService {
 
     private final ProductoRepository productoRepository;
+    private final CategoriaRepository categoriaRepository;
 
-    public ProductoService(ProductoRepository productoRepository) {
+    public ProductoService(
+            ProductoRepository productoRepository,
+            CategoriaRepository categoriaRepository) {
+
         this.productoRepository = productoRepository;
+        this.categoriaRepository = categoriaRepository;
     }
 
     // GET: Listar todos los productos
     public List<ProductoDTO> listar() {
+
         return productoRepository.findAll()
                 .stream()
                 .map(this::convertirADTO)
                 .toList();
     }
 
-    // GET: Buscar producto por ID
+    // GET: Buscar un producto por ID
     public Optional<ProductoDTO> buscarPorId(Long id) {
+
         return productoRepository.findById(id)
                 .map(this::convertirADTO);
     }
 
     // POST: Crear producto en MySQL
+    @Transactional
     public ProductoDTO crear(ProductoDTO datos) {
 
         Producto producto = convertirAEntidad(datos);
+
+        // Buscar o crear la categoria
+        String nombreCategoria = datos.categoria().trim();
+
+        Categoria categoria =
+                obtenerOCrearCategoria(nombreCategoria);
+
+        // Guardar el nombre y la relacion
+        producto.setCategoria(nombreCategoria);
+        producto.setCategoriaEntidad(categoria);
 
         Producto guardado = productoRepository.save(producto);
 
@@ -54,12 +74,21 @@ public class ProductoService {
 
                     producto.setNombre(datos.nombre());
                     producto.setPrecio(datos.precio());
-                    producto.setCategoria(datos.categoria());
                     producto.setDescripcion(datos.descripcion());
                     producto.setImagen(datos.imagen());
                     producto.setOferta(datos.oferta());
                     producto.setDescuento(datos.descuento());
                     producto.setStock(datos.stock());
+
+                    // Actualizar tambien la categoria
+                    String nombreCategoria =
+                            datos.categoria().trim();
+
+                    Categoria categoria =
+                            obtenerOCrearCategoria(nombreCategoria);
+
+                    producto.setCategoria(nombreCategoria);
+                    producto.setCategoriaEntidad(categoria);
 
                     Producto actualizado =
                             productoRepository.save(producto);
@@ -75,11 +104,27 @@ public class ProductoService {
         return productoRepository.findById(id)
                 .map(producto -> {
 
-                    ProductoDTO eliminado = convertirADTO(producto);
+                    ProductoDTO eliminado =
+                            convertirADTO(producto);
 
                     productoRepository.delete(producto);
 
                     return eliminado;
+                });
+    }
+
+    // Buscar categoria o crearla si no existe
+    private Categoria obtenerOCrearCategoria(String nombre) {
+
+        return categoriaRepository
+                .findByNombreIgnoreCase(nombre)
+                .orElseGet(() -> {
+
+                    Categoria nuevaCategoria = new Categoria();
+
+                    nuevaCategoria.setNombre(nombre);
+
+                    return categoriaRepository.save(nuevaCategoria);
                 });
     }
 

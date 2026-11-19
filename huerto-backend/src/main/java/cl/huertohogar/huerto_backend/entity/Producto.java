@@ -2,6 +2,9 @@
 package cl.huertohogar.huerto_backend.entity;
 
 import jakarta.persistence.*;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
 
 @Entity
 @Table(name = "productos")
@@ -83,6 +86,12 @@ public class Producto {
         this.stock = stock;
     }
 
+    // Relacion con la tabla categorias
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoria_id")
+    private Categoria categoriaEntidad;
+
+
     private String nombre;
 
     private Integer precio;
@@ -101,4 +110,14 @@ public class Producto {
 
     public Producto() {
     }
+
+    public Categoria getCategoriaEntidad() {
+        return categoriaEntidad;
+    }
+
+    public void setCategoriaEntidad(Categoria categoriaEntidad) {
+        this.categoriaEntidad = categoriaEntidad;
+    }
+
+
 }
