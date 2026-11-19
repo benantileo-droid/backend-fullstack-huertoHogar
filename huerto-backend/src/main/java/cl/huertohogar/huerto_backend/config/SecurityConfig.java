@@ -22,60 +22,67 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
-                // API sin sesiones ni autenticacion por cookies
+                // API REST con JWT, sin sesiones por cookies
                 .csrf(csrf -> csrf.disable())
 
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
                 )
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // Swagger publico
+                        // SWAGGER: Acceso publico
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // Registro y login publicos
+                        // AUTENTICACION: Registro y login publicos
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/auth/registro",
                                 "/api/v1/auth/login"
                         ).permitAll()
 
-                        // Consultar productos y estado
+                        // ESTADO: Consulta publica
                         .requestMatchers(
                                 HttpMethod.GET,
-                                "/api/v1/estado",
+                                "/api/v1/estado"
+                        ).permitAll()
+
+                        // PRODUCTOS: Consultas publicas
+                        .requestMatchers(
+                                HttpMethod.GET,
                                 "/api/v1/productos",
                                 "/api/v1/productos/**"
                         ).permitAll()
 
-                        // Crear productos: ADMIN o VENDEDOR
+                        // CREAR PRODUCTOS: Solo ADMIN
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/productos"
-                        ).hasAnyRole("ADMIN", "VENDEDOR")
+                        ).hasRole("ADMIN")
 
-                        // Actualizar productos: ADMIN o VENDEDOR
+                        // ACTUALIZAR PRODUCTOS: Solo ADMIN
                         .requestMatchers(
                                 HttpMethod.PUT,
                                 "/api/v1/productos/**"
-                        ).hasAnyRole("ADMIN", "VENDEDOR")
+                        ).hasRole("ADMIN")
 
-                        // Eliminar productos: solo ADMIN
+                        // ELIMINAR PRODUCTOS: Solo ADMIN
                         .requestMatchers(
                                 HttpMethod.DELETE,
                                 "/api/v1/productos/**"
                         ).hasRole("ADMIN")
 
-                        // El resto necesita autenticacion
+                        // Demas rutas: Requieren autenticacion
                         .anyRequest().authenticated()
                 )
 
-                // Autenticacion mediante JWT
+                // Verificar tokens JWT
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .jwtAuthenticationConverter(
@@ -84,21 +91,26 @@ public class SecurityConfig {
                         )
                 )
 
-                // Desactivar el login temporal
+                // Desactivar login tradicional
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable());
 
         return http.build();
     }
 
-    // Convertir el rol del JWT en un permiso de Spring
+    // Convertir el rol del JWT en autoridad de Spring
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
         JwtGrantedAuthoritiesConverter roles =
                 new JwtGrantedAuthoritiesConverter();
 
+        // Leer el campo "rol" del token JWT
         roles.setAuthoritiesClaimName("rol");
+
+        // CLIENTE -> ROLE_CLIENTE
+        // VENDEDOR -> ROLE_VENDEDOR
+        // ADMIN -> ROLE_ADMIN
         roles.setAuthorityPrefix("ROLE_");
 
         JwtAuthenticationConverter converter =

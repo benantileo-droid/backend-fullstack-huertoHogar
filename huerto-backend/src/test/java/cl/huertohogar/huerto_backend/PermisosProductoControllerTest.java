@@ -43,7 +43,7 @@ class PermisosProductoControllerTest {
     @Autowired
     private JwtService jwtService;
 
-    // Crear un usuario temporal con el rol indicado
+    // Crear usuario temporal y obtener su JWT
     private String crearToken(Rol rol) {
 
         Usuario usuario = new Usuario();
@@ -57,12 +57,13 @@ class PermisosProductoControllerTest {
         );
         usuario.setRol(rol);
 
-        Usuario guardado = usuarioRepository.saveAndFlush(usuario);
+        Usuario guardado =
+                usuarioRepository.saveAndFlush(usuario);
 
         return jwtService.generarToken(guardado).token();
     }
 
-    // Datos validos para crear un producto
+    // JSON valido para las solicitudes
     private String productoJson() {
         return """
             {
@@ -78,7 +79,24 @@ class PermisosProductoControllerTest {
             """;
     }
 
-    // 1. Un visitante sin JWT no puede crear productos
+    // Crear producto temporal directamente en MySQL
+    private Producto crearProductoTemporal() {
+
+        Producto producto = new Producto();
+
+        producto.setNombre("Producto de prueba");
+        producto.setPrecio(1500);
+        producto.setCategoria("Frutas");
+        producto.setDescripcion("Prueba de seguridad");
+        producto.setImagen("prueba.jpg");
+        producto.setOferta(false);
+        producto.setDescuento(0);
+        producto.setStock(10);
+
+        return productoRepository.saveAndFlush(producto);
+    }
+
+    // PRUEBA 1: Visitante sin JWT no puede crear
     @Test
     void visitanteNoPuedeCrearProducto() throws Exception {
 
@@ -90,7 +108,7 @@ class PermisosProductoControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // 2. Un CLIENTE con JWT no puede crear productos
+    // PRUEBA 2: CLIENTE no puede crear
     @Test
     void clienteNoPuedeCrearProducto() throws Exception {
 
@@ -105,125 +123,51 @@ class PermisosProductoControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    // 3. Un VENDEDOR puede crear productos
+    // PRUEBA 3: VENDEDOR no puede crear
     @Test
-    void vendedorPuedeCrearProducto() throws Exception {
+    void vendedorNoPuedeCrearProducto() throws Exception {
 
         String token = crearToken(Rol.VENDEDOR);
+
+        long cantidadInicial = productoRepository.count();
 
         mockMvc.perform(
                         post("/api/v1/productos")
                                 .header("Authorization", "Bearer " + token)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(productoJson())
-                )
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.nombre")
-                        .value("Manzana de prueba"));
-    }
-
-    // 4. Un VENDEDOR no puede eliminar productos
-    @Test
-    void vendedorNoPuedeEliminarProducto() throws Exception {
-
-        String token = crearToken(Rol.VENDEDOR);
-
-        mockMvc.perform(
-                        delete("/api/v1/productos/{id}", 999999L)
-                                .header("Authorization", "Bearer " + token)
                 )
                 .andExpect(status().isForbidden());
+
+        assertEquals(
+                cantidadInicial,
+                productoRepository.count()
+        );
     }
 
-    // 5. Un ADMIN puede eliminar productos
+    // PRUEBA 4: VENDEDOR no puede actualizar
     @Test
-    void adminPuedeEliminarProducto() throws Exception {
+    void vendedorNoPuedeActualizarProducto() throws Exception {
 
-        String token = crearToken(Rol.ADMIN);
-
-        Producto producto = new Producto();
-
-        producto.setNombre("Producto para eliminar");
-        producto.setPrecio(1500);
-        producto.setCategoria("Frutas");
-        producto.setDescripcion("Prueba ADMIN");
-        producto.setImagen("prueba.jpg");
-        producto.setOferta(false);
-        producto.setDescuento(0);
-        producto.setStock(10);
-
-        Producto guardado =
-                productoRepository.saveAndFlush(producto);
-
-        Long id = guardado.getId();
-
-        mockMvc.perform(
-                        delete("/api/v1/productos/{id}", id)
-                                .header("Authorization", "Bearer " + token)
-                )
-                .andExpect(status().isNoContent());
-
-        productoRepository.flush();
-
-        assertFalse(productoRepository.existsById(id));
-    }
-
-    @Test
-    void vendedorPuedeActualizarProducto() throws Exception {
-
-        // Generar un JWT de VENDEDOR
         String token = crearToken(Rol.VENDEDOR);
 
-        // Crear un producto para actualizar
-        String respuesta = mockMvc.perform(
-                        post("/api/v1/productos")
-                                .header("Authorization", "Bearer " + token)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(productoJson())
-                )
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+        Producto producto = crearProductoTemporal();
 
-        // Obtener el ID del producto creado
-        Number idGenerado =
-                com.jayway.jsonpath.JsonPath.read(
-                        respuesta, "$.id"
-                );
+        Long id = producto.getId();
 
-        long id = idGenerado.longValue();
-
-        // Nuevos datos del producto
-        String actualizadoJson = """
-        {
-            "nombre": "Manzana actualizada",
-            "precio": 2500,
-            "categoria": "Frutas",
-            "descripcion": "Precio actualizado por vendedor",
-            "imagen": "manzana.jpg",
-            "oferta": false,
-            "descuento": 0,
-            "stock": 20
-        }
-        """;
-
-        // Actualizar utilizando PUT
         mockMvc.perform(
                         put("/api/v1/productos/{id}", id)
                                 .header("Authorization", "Bearer " + token)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(actualizadoJson)
+                                .content(productoJson())
                 )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.precio").value(2500));
+                .andExpect(status().isForbidden());
 
-        // Comprobar el cambio en MySQL
         productoRepository.flush();
 
+        // El precio debe seguir siendo el original
         assertEquals(
-                2500,
+                1500,
                 productoRepository.findById(id)
                         .orElseThrow()
                         .getPrecio()
@@ -231,7 +175,7 @@ class PermisosProductoControllerTest {
         );
     }
 
-
+    // PRUEBA 5: CLIENTE no puede actualizar
     @Test
     void clienteNoPuedeActualizarProducto() throws Exception {
 
@@ -246,6 +190,48 @@ class PermisosProductoControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    // PRUEBA 6: VENDEDOR no puede eliminar
+    @Test
+    void vendedorNoPuedeEliminarProducto() throws Exception {
+
+        String token = crearToken(Rol.VENDEDOR);
+
+        Producto producto = crearProductoTemporal();
+
+        Long id = producto.getId();
+
+        mockMvc.perform(
+                        delete("/api/v1/productos/{id}", id)
+                                .header("Authorization", "Bearer " + token)
+                )
+                .andExpect(status().isForbidden());
+
+        // Comprobar que el producto sigue existiendo
+        assertTrue(productoRepository.existsById(id));
+    }
+
+    // PRUEBA 7: ADMIN puede eliminar
+    @Test
+    void adminPuedeEliminarProducto() throws Exception {
+
+        String token = crearToken(Rol.ADMIN);
+
+        Producto producto = crearProductoTemporal();
+
+        Long id = producto.getId();
+
+        mockMvc.perform(
+                        delete("/api/v1/productos/{id}", id)
+                                .header("Authorization", "Bearer " + token)
+                )
+                .andExpect(status().isNoContent());
+
+        productoRepository.flush();
+
+        assertFalse(productoRepository.existsById(id));
+    }
+
+    // PRUEBA 8: Un JWT invalido debe rechazarse
     @Test
     void jwtInvalidoNoPuedeCrearProducto() throws Exception {
 
@@ -260,6 +246,4 @@ class PermisosProductoControllerTest {
                 )
                 .andExpect(status().isUnauthorized());
     }
-
-
 }
