@@ -1,6 +1,9 @@
 
 package cl.huertohogar.huerto_backend.config;
 
+import cl.huertohogar.huerto_backend.entity.Usuario;
+import cl.huertohogar.huerto_backend.repository.UsuarioRepository;
+
 import jakarta.servlet.DispatcherType;
 
 import org.springframework.context.annotation.Bean;
@@ -8,16 +11,21 @@ import org.springframework.context.annotation.Configuration;
 
 import org.springframework.http.HttpMethod;
 
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Collection;
 
 @Configuration
 @EnableWebSecurity
@@ -25,16 +33,13 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
+            HttpSecurity http,
+            UsuarioRepository usuarioRepository
     ) throws Exception {
 
         // =====================================
-        // CONVERTIR ROL DEL JWT
+        // CONVERSION DE ROLES JWT
         // =====================================
-
-        // ADMIN -> ROLE_ADMIN
-        // VENDEDOR -> ROLE_VENDEDOR
-        // CLIENTE -> ROLE_CLIENTE
 
         JwtGrantedAuthoritiesConverter rolesConverter =
                 new JwtGrantedAuthoritiesConverter();
@@ -45,12 +50,73 @@ public class SecurityConfig {
         JwtAuthenticationConverter jwtConverter =
                 new JwtAuthenticationConverter();
 
+        // =====================================
+        // NUEVO: VERIFICAR ROL ACTUAL EN MYSQL
+        // =====================================
+
         jwtConverter.setJwtGrantedAuthoritiesConverter(
-                rolesConverter
+                (Jwt jwt) -> {
+
+                    // 1. Obtener el correo del JWT.
+
+                    String correo = jwt.getSubject();
+
+                    // 2. Obtener el rol guardado
+                    // en el momento de iniciar sesión.
+
+                    String rolToken =
+                            jwt.getClaimAsString("rol");
+
+                    if (
+                            correo == null ||
+                                    correo.isBlank() ||
+                                    rolToken == null ||
+                                    rolToken.isBlank()
+                    ) {
+
+                        throw new BadCredentialsException(
+                                "El JWT no contiene los datos requeridos."
+                        );
+                    }
+
+                    // 3. Consultar el usuario actual
+                    // directamente en MySQL.
+
+                    Usuario usuario =
+                            usuarioRepository.findByCorreo(correo)
+                                    .orElseThrow(() ->
+                                            new BadCredentialsException(
+                                                    "El usuario ya no existe."
+                                            )
+                                    );
+
+                    // 4. Comprobar que el rol actual
+                    // coincida con el rol del JWT.
+
+                    if (
+                            usuario.getRol() == null ||
+                                    !usuario.getRol().name()
+                                            .equalsIgnoreCase(rolToken)
+                    ) {
+
+                        throw new BadCredentialsException(
+                                "El rol del usuario cambió. " +
+                                        "Debe iniciar sesión nuevamente."
+                        );
+                    }
+
+                    // 5. Si el rol coincide,
+                    // conceder las autoridades del JWT.
+
+                    Collection<GrantedAuthority> authorities =
+                            rolesConverter.convert(jwt);
+
+                    return authorities;
+                }
         );
 
         // =====================================
-        // CONFIGURACION DE SEGURIDAD
+        // SEGURIDAD HTTP
         // =====================================
 
         http
@@ -76,7 +142,7 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // =========================
-                        // SWAGGER PUBLICO
+                        // SWAGGER
                         // =========================
 
                         .requestMatchers(
@@ -96,8 +162,7 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // =========================
-                        // CONSULTAS PUBLICAS
-                        // PRODUCTOS Y ESTADO
+                        // PRODUCTOS - LECTURA
                         // =========================
 
                         .requestMatchers(
@@ -127,7 +192,7 @@ public class SecurityConfig {
                         ).hasRole("ADMIN")
 
                         // =========================
-                        // CATEGORIAS PUBLICAS
+                        // CATEGORIAS - LECTURA
                         // =========================
 
                         .requestMatchers(
@@ -156,8 +221,7 @@ public class SecurityConfig {
                         ).hasRole("ADMIN")
 
                         // =========================
-                        // BOLETAS - CREAR COMPRA
-                        // CLIENTE Y ADMIN
+                        // BOLETAS - CREAR
                         // =========================
 
                         .requestMatchers(
@@ -170,7 +234,6 @@ public class SecurityConfig {
 
                         // =========================
                         // BOLETAS - MIS COMPRAS
-                        // CLIENTE Y ADMIN
                         // =========================
 
                         .requestMatchers(
@@ -183,7 +246,6 @@ public class SecurityConfig {
 
                         // =========================
                         // BOLETAS - LISTAR TODAS
-                        // VENDEDOR Y ADMIN
                         // =========================
 
                         .requestMatchers(
@@ -195,8 +257,7 @@ public class SecurityConfig {
                         )
 
                         // =========================
-                        // BOLETAS - CONSULTAR POR ID
-                        // CONTROL ADICIONAL EN SERVICE
+                        // BOLETAS - DETALLE
                         // =========================
 
                         .requestMatchers(
@@ -209,29 +270,32 @@ public class SecurityConfig {
                         )
 
                         // =========================
-                        // NUEVO: ADMINISTRAR USUARIOS
-                        // SOLO CONSULTA PARA ADMIN
+                        // USUARIOS - LISTAR
                         // =========================
 
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/admin/usuarios"
                         ).hasRole("ADMIN")
-                        // Solo ADMIN puede cambiar el rol de un usuario
+
+                        // =========================
+                        // USUARIOS - CAMBIAR ROL
+                        // =========================
+
                         .requestMatchers(
                                 HttpMethod.PUT,
-                                "/api/v1/admin/usuarios/*/rol"
+                                "/api/v1/admin/usuarios/{id}/rol"
                         ).hasRole("ADMIN")
 
                         // =========================
-                        // BLOQUEAR RUTAS NO DEFINIDAS
+                        // RESTO DE RUTAS
                         // =========================
 
                         .anyRequest().denyAll()
                 )
 
                 // =====================================
-                // VALIDAR JWT EN LAS SOLICITUDES
+                // AUTENTICACION JWT
                 // =====================================
 
                 .oauth2ResourceServer(oauth2 ->
