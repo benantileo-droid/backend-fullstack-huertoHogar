@@ -19,7 +19,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class ProductoControllerTest {
+@Transactional
+class ProductoControllerTest {
 
     @Autowired
     private ProductoRepository productoRepository;

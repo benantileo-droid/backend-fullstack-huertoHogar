@@ -92,4 +92,48 @@ class LoginUsuarioControllerTest {
         assertNotNull(jwt.getExpiresAt());
         assertTrue(jwt.getExpiresAt().isAfter(Instant.now()));
     }
+
+    @Test
+    @Transactional
+    void debeRechazarPasswordIncorrecta() throws Exception {
+
+        // 1. Crear un correo unico
+        String correo = "login.invalido."
+                + UUID.randomUUID()
+                + "@ejemplo.com";
+
+        // 2. Registrar un usuario con contraseña correcta
+        String registroJson = """
+        {
+            "nombre": "Cliente de prueba",
+            "correo": "%s",
+            "password": "ClaveCorrecta123!"
+        }
+        """.formatted(correo);
+
+        mockMvc.perform(
+                        post("/api/v1/auth/registro")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(registroJson)
+                )
+                .andExpect(status().isCreated());
+
+        // 3. Intentar iniciar sesion con otra contraseña
+        String loginIncorrecto = """
+        {
+            "correo": "%s",
+            "password": "ClaveEquivocada123!"
+        }
+        """.formatted(correo);
+
+        // 4. Debe devolver 401 y no entregar un JWT
+        mockMvc.perform(
+                        post("/api/v1/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(loginIncorrecto)
+                )
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.token").doesNotExist());
+    }
+
 }
