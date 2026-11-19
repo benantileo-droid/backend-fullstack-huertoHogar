@@ -15,7 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-
+import org.springframework.security.config.Customizer;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -44,7 +44,7 @@ public class SecurityConfig {
         );
 
         http
-                // API REST con JWT, sin sesiones por cookies
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
 
                 .sessionManagement(session ->
