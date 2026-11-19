@@ -11,7 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
-
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.List;
 
 @RestController
@@ -82,6 +82,7 @@ public class ProductoController {
                     description = "Datos del producto invalidos"
             )
     })
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ProductoDTO> crearProducto(
             @Valid @RequestBody ProductoDTO datos) {
@@ -110,6 +111,8 @@ public class ProductoController {
                     description = "Producto no encontrado"
             )
     })
+    // PUT: Actualizar un producto existente
+    @SecurityRequirement(name = "bearerAuth")
     @PutMapping("/{id}")
     public ResponseEntity<ProductoDTO> actualizarProducto(
             @PathVariable Long id,
@@ -135,6 +138,7 @@ public class ProductoController {
                     description = "Producto no encontrado"
             )
     })
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarProducto(
             @PathVariable Long id) {
@@ -145,4 +149,5 @@ public class ProductoController {
 
         return ResponseEntity.notFound().build();
     }
+
 }
