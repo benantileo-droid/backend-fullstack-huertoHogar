@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 import org.springframework.http.HttpMethod;
 
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -15,7 +16,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
-import org.springframework.security.config.Customizer;
+
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -27,8 +28,13 @@ public class SecurityConfig {
             HttpSecurity http
     ) throws Exception {
 
-        // Convertir el campo "rol" del JWT
-        // en ROLE_ADMIN, ROLE_VENDEDOR o ROLE_CLIENTE
+        // =====================================
+        // CONVERTIR ROL DEL JWT
+        // =====================================
+
+        // ADMIN -> ROLE_ADMIN
+        // VENDEDOR -> ROLE_VENDEDOR
+        // CLIENTE -> ROLE_CLIENTE
 
         JwtGrantedAuthoritiesConverter rolesConverter =
                 new JwtGrantedAuthoritiesConverter();
@@ -43,8 +49,13 @@ public class SecurityConfig {
                 rolesConverter
         );
 
+        // =====================================
+        // CONFIGURACION DE SEGURIDAD
+        // =====================================
+
         http
                 .cors(Customizer.withDefaults())
+
                 .csrf(AbstractHttpConfigurer::disable)
 
                 .sessionManagement(session ->
@@ -55,15 +66,18 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // Despachos internos de errores
+                        // =========================
+                        // ERRORES INTERNOS
+                        // =========================
+
                         .dispatcherTypeMatchers(
                                 DispatcherType.ERROR,
                                 DispatcherType.FORWARD
                         ).permitAll()
 
-                        // =====================================
-                        // SWAGGER: ACCESO PUBLICO
-                        // =====================================
+                        // =========================
+                        // SWAGGER PUBLICO
+                        // =========================
 
                         .requestMatchers(
                                 "/swagger-ui/**",
@@ -71,9 +85,9 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // =====================================
-                        // AUTENTICACION: ACCESO PUBLICO
-                        // =====================================
+                        // =========================
+                        // AUTENTICACION PUBLICA
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.POST,
@@ -81,9 +95,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/login"
                         ).permitAll()
 
-                        // =====================================
-                        // PRODUCTOS: CONSULTAS PUBLICAS
-                        // =====================================
+                        // =========================
+                        // CONSULTAS PUBLICAS
+                        // PRODUCTOS Y ESTADO
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -92,9 +107,9 @@ public class SecurityConfig {
                                 "/api/v1/productos/{id}"
                         ).permitAll()
 
-                        // =====================================
-                        // PRODUCTOS: SOLO ADMIN
-                        // =====================================
+                        // =========================
+                        // PRODUCTOS - SOLO ADMIN
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.POST,
@@ -111,40 +126,78 @@ public class SecurityConfig {
                                 "/api/v1/productos/{id}"
                         ).hasRole("ADMIN")
 
-                        // =====================================
-                        // BOLETAS: CREAR COMPRA
+                        // =========================
+                        // CATEGORIAS PUBLICAS
+                        // =========================
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/categorias",
+                                "/api/v1/categorias/**"
+                        ).permitAll()
+
+                        // =========================
+                        // CATEGORIAS - SOLO ADMIN
+                        // =========================
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/categorias"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/categorias/**"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/v1/categorias/**"
+                        ).hasRole("ADMIN")
+
+                        // =========================
+                        // BOLETAS - CREAR COMPRA
                         // CLIENTE Y ADMIN
-                        // =====================================
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/boletas"
-                        ).hasAnyRole("CLIENTE", "ADMIN")
+                        ).hasAnyRole(
+                                "CLIENTE",
+                                "ADMIN"
+                        )
 
-                        // =====================================
-                        // BOLETAS: MIS COMPRAS
+                        // =========================
+                        // BOLETAS - MIS COMPRAS
                         // CLIENTE Y ADMIN
-                        // =====================================
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/boletas/mis-compras"
-                        ).hasAnyRole("CLIENTE", "ADMIN")
+                        ).hasAnyRole(
+                                "CLIENTE",
+                                "ADMIN"
+                        )
 
-                        // =====================================
-                        // BOLETAS: LISTAR TODAS
+                        // =========================
+                        // BOLETAS - LISTAR TODAS
                         // VENDEDOR Y ADMIN
-                        // =====================================
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/boletas"
-                        ).hasAnyRole("VENDEDOR", "ADMIN")
+                        ).hasAnyRole(
+                                "VENDEDOR",
+                                "ADMIN"
+                        )
 
-                        // =====================================
-                        // BOLETAS: CONSULTAR POR ID
-                        // CLIENTE, VENDEDOR Y ADMIN
-                        // =====================================
+                        // =========================
+                        // BOLETAS - CONSULTAR POR ID
+                        // CONTROL ADICIONAL EN SERVICE
+                        // =========================
 
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -155,43 +208,25 @@ public class SecurityConfig {
                                 "ADMIN"
                         )
 
-                        // =====================================
+                        // =========================
+                        // NUEVO: ADMINISTRAR USUARIOS
+                        // SOLO CONSULTA PARA ADMIN
+                        // =========================
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/admin/usuarios"
+                        ).hasRole("ADMIN")
+
+                        // =========================
                         // BLOQUEAR RUTAS NO DEFINIDAS
-                        // =====================================
+                        // =========================
 
-                                // ==========================================
-// CATEGORIAS - PERMISOS
-// ==========================================
-
-// Cualquier visitante puede consultar categorias
-                                .requestMatchers(
-                                        HttpMethod.GET,
-                                        "/api/v1/categorias",
-                                        "/api/v1/categorias/**"
-                                ).permitAll()
-
-// Solo ADMIN puede crear categorias
-                                .requestMatchers(
-                                        HttpMethod.POST,
-                                        "/api/v1/categorias"
-                                ).hasRole("ADMIN")
-
-// Solo ADMIN puede editar categorias
-                                .requestMatchers(
-                                        HttpMethod.PUT,
-                                        "/api/v1/categorias/**"
-                                ).hasRole("ADMIN")
-
-// Solo ADMIN puede eliminar categorias
-                                .requestMatchers(
-                                        HttpMethod.DELETE,
-                                        "/api/v1/categorias/**"
-                                ).hasRole("ADMIN")
                         .anyRequest().denyAll()
                 )
 
                 // =====================================
-                // VALIDAR JWT
+                // VALIDAR JWT EN LAS SOLICITUDES
                 // =====================================
 
                 .oauth2ResourceServer(oauth2 ->
@@ -202,7 +237,10 @@ public class SecurityConfig {
                         )
                 )
 
-                // Desactivar login tradicional
+                // =====================================
+                // DESACTIVAR LOGIN TRADICIONAL
+                // =====================================
+
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable);
 
