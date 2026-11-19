@@ -17,15 +17,41 @@ public class SecurityConfig {
             HttpSecurity http) throws Exception {
 
         http
+                // Excluir solamente el registro de la protección CSRF
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(
+                                "/api/v1/auth/registro"
+                        )
+                )
+
                 .authorizeHttpRequests(auth -> auth
+
+                        // Permitir acceso a Swagger
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+
+                        // Permitir consultar productos
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/v1/estado",
                                 "/api/v1/productos",
                                 "/api/v1/productos/**"
                         ).permitAll()
+
+                        // Permitir registrar nuevos usuarios
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/registro"
+                        ).permitAll()
+
+                        // Proteger los demás endpoints
                         .anyRequest().authenticated()
                 )
+
+                // Login temporal de Spring Security
                 .formLogin(withDefaults());
 
         return http.build();
