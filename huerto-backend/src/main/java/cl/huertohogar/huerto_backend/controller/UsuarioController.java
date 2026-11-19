@@ -1,7 +1,9 @@
 
 package cl.huertohogar.huerto_backend.controller;
 
+import cl.huertohogar.huerto_backend.dto.LoginUsuarioDTO;
 import cl.huertohogar.huerto_backend.dto.RegistroUsuarioDTO;
+import cl.huertohogar.huerto_backend.dto.TokenRespuestaDTO;
 import cl.huertohogar.huerto_backend.dto.UsuarioRespuestaDTO;
 import cl.huertohogar.huerto_backend.service.UsuarioService;
 
@@ -30,6 +32,7 @@ public class UsuarioController {
         this.usuarioService = usuarioService;
     }
 
+    // REGISTRO DE USUARIOS
     @Operation(
             summary = "Registrar un usuario",
             description = "Crea un usuario con rol CLIENTE y contraseña protegida con BCrypt"
@@ -41,21 +44,51 @@ public class UsuarioController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Datos de registro invalidos"
+                    description = "Datos invalidos"
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "El correo ya esta registrado"
+                    description = "Correo ya registrado"
             )
     })
     @PostMapping("/registro")
     public ResponseEntity<UsuarioRespuestaDTO> registrar(
             @Valid @RequestBody RegistroUsuarioDTO datos) {
 
-        UsuarioRespuestaDTO usuario = usuarioService.registrar(datos);
+        UsuarioRespuestaDTO usuario =
+                usuarioService.registrar(datos);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(usuario);
+    }
+
+    // INICIO DE SESION
+    @Operation(
+            summary = "Iniciar sesion",
+            description = "Verifica las credenciales y devuelve un JWT"
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Inicio de sesion correcto"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Datos invalidos"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Correo o contraseña incorrectos"
+            )
+    })
+    @PostMapping("/login")
+    public ResponseEntity<TokenRespuestaDTO> login(
+            @Valid @RequestBody LoginUsuarioDTO datos) {
+
+        TokenRespuestaDTO token =
+                usuarioService.iniciarSesion(datos);
+
+        return ResponseEntity.ok(token);
     }
 }

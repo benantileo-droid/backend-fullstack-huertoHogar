@@ -17,16 +17,17 @@ public class SecurityConfig {
             HttpSecurity http) throws Exception {
 
         http
-                // Excluir solamente el registro de la protección CSRF
+                // Excluir registro y login de CSRF
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers(
-                                "/api/v1/auth/registro"
+                                "/api/v1/auth/registro",
+                                "/api/v1/auth/login"
                         )
                 )
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // Permitir acceso a Swagger
+                        // Permitir Swagger
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
@@ -41,13 +42,14 @@ public class SecurityConfig {
                                 "/api/v1/productos/**"
                         ).permitAll()
 
-                        // Permitir registrar nuevos usuarios
+                        // Permitir registro y login
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/v1/auth/registro"
+                                "/api/v1/auth/registro",
+                                "/api/v1/auth/login"
                         ).permitAll()
 
-                        // Proteger los demás endpoints
+                        // Proteger los demas endpoints
                         .anyRequest().authenticated()
                 )
 

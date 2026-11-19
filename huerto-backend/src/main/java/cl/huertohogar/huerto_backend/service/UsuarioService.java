@@ -1,8 +1,11 @@
 
 package cl.huertohogar.huerto_backend.service;
 
+import cl.huertohogar.huerto_backend.dto.LoginUsuarioDTO;
 import cl.huertohogar.huerto_backend.dto.RegistroUsuarioDTO;
+import cl.huertohogar.huerto_backend.dto.TokenRespuestaDTO;
 import cl.huertohogar.huerto_backend.dto.UsuarioRespuestaDTO;
+
 import cl.huertohogar.huerto_backend.entity.Rol;
 import cl.huertohogar.huerto_backend.entity.Usuario;
 import cl.huertohogar.huerto_backend.repository.UsuarioRepository;
@@ -20,25 +23,27 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService) {
 
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
-    // Registrar un nuevo usuario
+    // REGISTRO: Crear un usuario
     @Transactional
     public UsuarioRespuestaDTO registrar(RegistroUsuarioDTO datos) {
 
-        // 1. Normalizar el correo
         String correo = datos.correo()
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
-        // 2. Comprobar si el correo ya existe
+        // Comprobar si el correo ya existe
         if (usuarioRepository.existsByCorreo(correo)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
@@ -46,29 +51,61 @@ public class UsuarioService {
             );
         }
 
-        // 3. Crear el usuario
         Usuario usuario = new Usuario();
 
         usuario.setNombre(datos.nombre().trim());
         usuario.setCorreo(correo);
 
-        // 4. Proteger la contraseña con BCrypt
+        // Proteger la contraseña
         usuario.setPasswordHash(
                 passwordEncoder.encode(datos.password())
         );
 
-        // 5. Asignar el rol CLIENTE
+        // Asignar rol inicial
         usuario.setRol(Rol.CLIENTE);
 
-        // 6. Guardar en MySQL
         Usuario guardado = usuarioRepository.save(usuario);
 
-        // 7. Devolver los datos sin contraseña
+        // Devolver informacion sin contraseña
         return new UsuarioRespuestaDTO(
                 guardado.getId(),
                 guardado.getNombre(),
                 guardado.getCorreo(),
                 guardado.getRol()
         );
+    }
+
+    // LOGIN: Iniciar sesion
+    @Transactional(readOnly = true)
+    public TokenRespuestaDTO iniciarSesion(LoginUsuarioDTO datos) {
+
+        // 1. Normalizar el correo
+        String correo = datos.correo()
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        // 2. Buscar usuario en MySQL
+        Usuario usuario = usuarioRepository
+                .findByCorreo(correo)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "Correo o contraseña incorrectos"
+                ));
+
+        // 3. Comprobar la contraseña con BCrypt
+        boolean passwordCorrecta = passwordEncoder.matches(
+                datos.password(),
+                usuario.getPasswordHash()
+        );
+
+        if (!passwordCorrecta) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Correo o contraseña incorrectos"
+            );
+        }
+
+        // 4. Generar JWT
+        return jwtService.generarToken(usuario);
     }
 }
