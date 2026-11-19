@@ -159,6 +159,34 @@ public class SecurityConfig {
                         // BLOQUEAR RUTAS NO DEFINIDAS
                         // =====================================
 
+                                // ==========================================
+// CATEGORIAS - PERMISOS
+// ==========================================
+
+// Cualquier visitante puede consultar categorias
+                                .requestMatchers(
+                                        HttpMethod.GET,
+                                        "/api/v1/categorias",
+                                        "/api/v1/categorias/**"
+                                ).permitAll()
+
+// Solo ADMIN puede crear categorias
+                                .requestMatchers(
+                                        HttpMethod.POST,
+                                        "/api/v1/categorias"
+                                ).hasRole("ADMIN")
+
+// Solo ADMIN puede editar categorias
+                                .requestMatchers(
+                                        HttpMethod.PUT,
+                                        "/api/v1/categorias/**"
+                                ).hasRole("ADMIN")
+
+// Solo ADMIN puede eliminar categorias
+                                .requestMatchers(
+                                        HttpMethod.DELETE,
+                                        "/api/v1/categorias/**"
+                                ).hasRole("ADMIN")
                         .anyRequest().denyAll()
                 )
 
