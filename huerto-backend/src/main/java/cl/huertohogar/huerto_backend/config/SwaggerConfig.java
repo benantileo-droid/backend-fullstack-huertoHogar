@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
         info = @Info(
                 title = "API Huerto Hogar",
                 version = "1.0",
-                description = "API REST de Huerto Hogar con Spring Boot, MySQL y JWT"
+                description = "API REST Fullstack II - Gestión de productos, categorías, usuarios y boletas"
         ),
         security = @SecurityRequirement(
                 name = "bearerAuth"
